@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Micro-Donation Widget</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f4f4f4;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .tabs {
+        display: flex;
+        margin-bottom: 20px;
+      }
+      .tab-button {
+        padding: 10px 20px;
+        cursor: pointer;
+        background: #007bff;
+        color: white;
+        border: none;
+        margin-right: 5px;
+        border-radius: 5px;
+        transition: background 0.3s ease;
+      }
+      .tab-button:hover {
+        background: #0056b3;
+      }
+      .tab {
+        display: none;
+      }
+      .active {
+        display: block;
+      }
+      .donation-form,
+      .past-donations,
+      .recommendations,
+      .impacts {
+        margin: 20px 0;
+      }
+      .donation-form input,
+      .donation-form button {
+        display: block;
+        margin: 10px 0;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #ddd;
+      }
+      .donation-form input {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .donation-form button {
+        background: #28a745;
+        color: white;
+        border: none;
+        cursor: pointer;
+        transition: background 0.3s ease;
+      }
+      .donation-form button:hover {
+        background: #218838;
+      }
+      .past-donations .donation-card,
+      .recommendations .recommendation-card {
+        background: white;
+        border: 1px solid #ddd;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+      }
+      .past-donations .donation-card img,
+      .recommendations .recommendation-card img {
+        width: 80px;
+        height: 80px;
+        object-fit: contain;
+        margin-right: 15px;
+      }
+      .recommendations input {
+        width: 100%;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #ddd;
+        margin-bottom: 20px;
+      }
+      .chart {
+        width: 100%;
+        height: 300px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Micro-Donation Widget</h1>
+      <div class="tabs">
+        <button class="tab-button" onclick="showTab('donate')">Donate</button>
+        <button class="tab-button" onclick="showTab('past')">
+          Past Donations
+        </button>
+        <button class="tab-button" onclick="showTab('recommend')">
+          Recommendations
+        </button>
+        <button class="tab-button" onclick="showTab('impact')">Impacts</button>
+      </div>
+
+      <!-- Donate Tab -->
+      <div id="donate" class="tab active donation-form">
+        <h2>Make a Donation</h2>
+        <input
+          type="text"
+          id="charityName"
+          placeholder="Charity Name"
+          required
+        />
+        <input
+          type="number"
+          id="donationAmount"
+          placeholder="Amount ($1, $5, $10)"
+          required
+        />
+        <input type="date" id="donationDate" required />
+        <button onclick="makeDonation()">Donate</button>
+      </div>
+
+      <!-- Past Donations Tab -->
+      <div id="past" class="tab past-donations">
+        <h2>Past Donations</h2>
+        <div id="donationsList"></div>
+      </div>
+
+      <!-- Recommendations Tab -->
+      <div id="recommend" class="tab recommendations">
+        <h2>Charity Recommendations</h2>
+        <input
+          type="text"
+          id="searchCharity"
+          placeholder="Search Charity..."
+          onkeyup="searchCharity()"
+        />
+        <div id="recommendationList"></div>
+      </div>
+
+      <!-- Impacts Tab -->
+      <div id="impact" class="tab impacts">
+        <h2>Impact Visualization</h2>
+        <canvas id="donationChart" class="chart"></canvas>
+        <canvas id="impactChart" class="chart"></canvas>
+      </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <script>
+      const charities = [
+        {
+          name: 'Akshaya Patra Foundation',
+          focusArea: 'Education & Nutrition',
+          mission:
+            'To ensure that no child in India is deprived of education because of hunger.',
+          impact:
+            'Provides mid-day meals to over 1.8 million children across 14 states.',
+          impactPeopleCount: 1800000,
+          financialTransparency:
+            'Receives a 4-star rating on Charity Navigator, audited financials available on their website.',
+          website: 'https://www.akshayapatra.org/',
+          image: 'https://www.akshayapatra.org/includefiles/settings/logo1.png',
+        },
+        {
+          name: 'CRY (Child Rights and You)',
+          focusArea: 'Child Rights & Education',
+          mission:
+            'To ensure happier and healthier childhoods for underprivileged children.',
+          impact:
+            'Impacting over 600,000 children annually through education, healthcare, and protection from exploitation.',
+          impactPeopleCount: 600000,
+          financialTransparency:
+            'Regularly publishes financial reports and maintains a high level of donor transparency.',
+          website: 'https://www.cry.org/',
+          image:
+            'https://upload.wikimedia.org/wikipedia/commons/a/a1/Child_Rights_and_You_%28CRY%29_Organization_logo.png',
+        },
+        {
+          name: 'HelpAge India',
+          focusArea: 'Elderly Care',
+          mission:
+            'To work for the cause and care of disadvantaged older persons and to improve their quality of life.',
+          impact:
+            'Provides healthcare, livelihood support, and advocacy for the rights of the elderly across India.',
+          impactPeopleCount: 'Not specified',
+          financialTransparency:
+            'Maintains audited financial reports with a high level of accountability and transparency.',
+          website: 'https://www.helpageindia.org/',
+          image:
+            'https://cfstatic.give.do/9bfe609f-3f7d-44e7-a83c-0b9662c8dcbc.jpg',
+        },
+        {
+          name: 'Goonj',
+          focusArea: 'Disaster Relief & Community Development',
+          mission:
+            'To address basic needs like clothing, education, and sanitation by turning urban surplus into a tool for rural development.',
+          impact:
+            'Has mobilized over 4,000 tons of material for development work in rural India.',
+          impactPeopleCount: 'Not specified',
+          financialTransparency:
+            'Known for transparent operations and detailed annual reports.',
+          website: 'https://goonj.org/',
+          image:
+            'https://goonj.org/wp-content/uploads/2020/06/Goonj-logo-10June20.png',
+        },
+        {
+          name: 'Pratham',
+          focusArea: 'Education',
+          mission:
+            'To ensure that every child in India is in school and learning well.',
+          impact:
+            'Directly reaches millions of children annually, improving literacy and learning outcomes.',
+          impactPeopleCount: 'Millions',
+          financialTransparency:
+            'Highly rated for its financial transparency and effectiveness.',
+          website: 'https://www.pratham.org/',
+          image:
+            'https://www.pratham.org/wp-content/uploads/2019/03/pratham-logo.svg',
+        },
+        {
+          name: 'SNEHA (Society for Nutrition, Education and Health Action)',
+          focusArea: 'Healthcare & Women Empowerment',
+          mission:
+            'To empower women and children in urban slums with access to better health and nutrition.',
+          impact:
+            "Significantly reduces maternal and neonatal mortality in Mumbai's slums.",
+          impactPeopleCount: 'Not specified',
+          financialTransparency:
+            'Provides detailed financial statements and impact reports.',
+          website: 'https://sneha.org/',
+          image: 'https://snehacharitabletrust.org/assets/images/logo.png',
+        },
+        {
+          name: 'Sammaan Foundation',
+          focusArea: 'Livelihood & Social Welfare',
+          mission:
+            'To provide sustainable livelihood opportunities to marginalized communities.',
+          impact:
+            'Has empowered over 10,000 rickshaw pullers by providing them with micro-loans and better working conditions.',
+          impactPeopleCount: 10000,
+          financialTransparency:
+            'Operates with transparency and regular financial audits.',
+          website: 'https://www.sammaan.org/',
+          image:
+            'https://images.jdmagicbox.com/comp/patna/n7/0612px612.x612.170605162735.x8n7/catalogue/sammaan-foundation-sheikhpura-patna-ngos-8l722y1156.jpg',
+        },
+        {
+          name: 'The Energy and Resources Institute (TERI)',
+          focusArea: 'Environment & Sustainability',
+          mission:
+            'To tackle issues related to the environment, energy, and sustainable development.',
+          impact:
+            'Research and policy advocacy influencing environmental policies and practices in India.',
+          impactPeopleCount: 'Not specified',
+          financialTransparency:
+            'Publishes detailed annual reports and financial statements.',
+          website: 'https://www.teriin.org/',
+          image:
+            'https://www.teriin.org/sites/default/files/main_teri_logo.png',
+        },
+        {
+          name: 'Save Life Foundation',
+          focusArea: 'Road Safety & Emergency Care',
+          mission:
+            'To save lives on roads in India through better emergency care and legal reforms.',
+          impact:
+            'Played a key role in getting the Good Samaritan Law passed in India.',
+          impactPeopleCount: 'Not specified',
+          financialTransparency:
+            'Highly transparent in financial dealings with regular audits.',
+          website: 'https://www.savelifefoundation.org/',
+          image:
+            'https://savelifefoundation.org/wp-content/uploads/2024/04/logo-white.png',
+        },
+        {
+          name: 'Smile Foundation',
+          focusArea: 'Education & Healthcare',
+          mission:
+            'To empower underprivileged children and youth through education, healthcare, and livelihood programs.',
+          impact:
+            'Reaches over 750,000 beneficiaries annually through various programs.',
+          impactPeopleCount: 750000,
+          financialTransparency:
+            'Strong financial governance with clear reporting practices.',
+          website: 'https://www.smilefoundationindia.org/',
+          image:
+            'https://encrypted-tbn3.gstatic.com/images?q=tbn:ANd9GcQgCSS1sLmaxqnN1T_tCqN-5_F4Y9aD2_udyfUHl6_8WRx3Lrig',
+        },
+        {
+          name: 'Teach For India',
+          focusArea: 'Education',
+          mission:
+            'To build a movement of leaders who will end educational inequity in India.',
+          impact:
+            'Impacts over 32,000 students annually through fellows teaching in under-resourced schools.',
+          impactPeopleCount: 32000,
+          financialTransparency:
+            'Maintains a high standard of financial transparency and accountability.',
+          website: 'https://www.teachforindia.org/',
+          image:
+            'https://cdn.prod.website-files.com/62f24893562f47d8766501aa/62f24ef3fde2c2f124a46baf_teachforindia_logo.svg',
+        },
+        {
+          name: 'Wildlife SOS',
+          focusArea: 'Wildlife Conservation',
+          mission:
+            "To conserve India's natural heritage, forests, and wildlife.",
+          impact:
+            'Rescued and rehabilitated thousands of animals, including elephants and sloth bears.',
+          impactPeopleCount: '2000',
+          financialTransparency:
+            'Transparent in operations with regular financial and impact reports.',
+          website: 'https://wildlifesos.org/',
+          image:
+            'https://wildlifesos.org/wp-content/uploads/2020/11/wsos-Bear-Logo-border-85x130-1.png',
+        },
+        {
+          name: 'Oxfam India',
+          focusArea: 'Poverty Alleviation & Social Justice',
+          mission: 'To end the injustice of poverty in India.',
+          impact:
+            'Works in 16 states, impacting over a million people annually through various poverty alleviation programs.',
+          impactPeopleCount: 1000000,
+          financialTransparency:
+            'Publishes annual reports detailing financials and program impact.',
+          website: 'https://www.oxfamindia.org/',
+          image:
+            'https://d1ns4ht6ytuzzo.cloudfront.net/oxfamdata/oxfamdatapublic/logo_oxfam.png',
+        },
+        {
+          name: 'Deepalaya',
+          focusArea: 'Education & Social Welfare',
+          mission:
+            'To enable self-reliance and education for the underprivileged, especially children.',
+          impact:
+            'Educates over 50,000 children annually, providing them with better opportunities.',
+          impactPeopleCount: 50000,
+          financialTransparency:
+            'Regular audits and transparent financial disclosures.',
+          website: 'https://deepalaya.org/',
+          image:
+            'https://deepalaya.org/wp-content/uploads/2022/12/logo-3-2.png',
+        },
+        {
+          name: 'Bhumi',
+          focusArea: 'Education & Youth Volunteering',
+          mission:
+            'To drive social change by fostering an environment for young volunteers to work on impactful projects.',
+          impact:
+            'Engages over 20,000 volunteers in educational and social programs reaching over 35,000 children.',
+          impactPeopleCount: 35000,
+          financialTransparency:
+            'Ensures transparency through detailed reports and audits.',
+          website: 'https://bhumi.ngo/',
+          image:
+            'https://www.bhumi.ngo/_next/static/media/BhumiNgoLogo.8431d033.svg',
+        },
+      ];
+
+      function showTab(tabName) {
+        document
+          .querySelectorAll('.tab')
+          .forEach((tab) => tab.classList.remove('active'));
+        document.getElementById(tabName).classList.add('active');
+        if (tabName === 'past') loadPastDonations();
+        if (tabName === 'recommend') loadRecommendations();
+        if (tabName === 'impact') loadImpactData();
+      }
+
+      function makeDonation() {
+        const charityName = document.getElementById('charityName').value;
+        const donationAmount = document.getElementById('donationAmount').value;
+        const donationDate = document.getElementById('donationDate').value;
+
+        if (charityName && donationAmount && donationDate) {
+          const charity = charities.find((c) => c.name === charityName);
+          const donation = {
+            charityName,
+            donationAmount,
+            donationDate,
+            charityImage: charity?.image || '',
+          };
+          const donations = JSON.parse(localStorage.getItem('donations')) || [];
+          donations.push(donation);
+          localStorage.setItem('donations', JSON.stringify(donations));
+          toastr.success('Donation made successfully!');
+          document.getElementById('charityName').value = '';
+          document.getElementById('donationAmount').value = '';
+          document.getElementById('donationDate').value = '';
+        } else {
+          toastr.error('Please fill all fields.');
+        }
+      }
+
+      function loadPastDonations() {
+        const donations = JSON.parse(localStorage.getItem('donations')) || [];
+        const donationsList = document.getElementById('donationsList');
+        donationsList.innerHTML = donations
+          .map(
+            (d) => `
+      <div class="donation-card">
+        <img src="${d.charityImage}" alt="${d.charityName} logo">
+        <div>
+            <p><strong>Date:</strong> ${d.donationDate}</p>
+            <p><strong>Amount:</strong> ${d.donationAmount}</p>
+<p><strong>Charity:</strong> ${d.charityName}</p>
+</div>
+</div>
+`
+          )
+          .join('');
+      }
+
+      function loadRecommendations() {
+        const recommendationList =
+          document.getElementById('recommendationList');
+        recommendationList.innerHTML = charities
+          .map(
+            (c) => `
+      <div class="recommendation-card">
+        <img src="${c.image}" alt="${c.name} logo">
+        <div>
+          <p><strong>${c.name}</strong></p>
+          <p>${c.mission}</p>
+          <a href="${c.website}" target="_blank">Website</a>
+        </div>
+      </div>
+    `
+          )
+          .join('');
+      }
+
+      function searchCharity() {
+        const query = document
+          .getElementById('searchCharity')
+          .value.toLowerCase();
+        const filteredCharities = charities.filter((c) =>
+          c.name.toLowerCase().includes(query)
+        );
+        const recommendationList =
+          document.getElementById('recommendationList');
+        recommendationList.innerHTML = filteredCharities
+          .map(
+            (c) => `
+      <div class="recommendation-card">
+        <img src="${c.image}" alt="${c.name} logo">
+        <div>
+          <p><strong>${c.name}</strong></p>
+          <p>${c.mission}</p>
+          <a href="${c.website}" target="_blank">Website</a>
+        </div>
+      </div>
+    `
+          )
+          .join('');
+      }
+
+      function loadImpactData() {
+        const donationCtx = document
+          .getElementById('donationChart')
+          .getContext('2d');
+        const impactCtx = document
+          .getElementById('impactChart')
+          .getContext('2d');
+        const donations = JSON.parse(localStorage.getItem('donations')) || [];
+        const charityImpact = charities.reduce((acc, charity) => {
+          const donationTotal = donations
+            .filter((d) => d.charityName === charity.name)
+            .reduce((sum, d) => sum + parseFloat(d.donationAmount), 0);
+          if (donationTotal > 0) {
+            acc.push({
+              label: charity.name,
+              donationData: [donationTotal],
+              impactData: [charity.impactPeopleCount || 0],
+              backgroundColor: 'rgba(75, 192, 192, 0.2)',
+              borderColor: 'rgba(75, 192, 192, 1)',
+              borderWidth: 1,
+            });
+          }
+          return acc;
+        }, []);
+
+        new Chart(donationCtx, {
+          type: 'bar',
+          data: {
+            labels: charityImpact.map((c) => c.label),
+            datasets: [
+              {
+                label: 'Donation Amount',
+                data: charityImpact.map((c) => c.donationData[0]),
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: {
+                beginAtZero: true,
+              },
+              y: {
+                beginAtZero: true,
+              },
+            },
+          },
+        });
+
+        new Chart(impactCtx, {
+          type: 'bar',
+          data: {
+            labels: charityImpact.map((c) => c.label),
+            datasets: [
+              {
+                label: 'People Impacted',
+                data: charityImpact.map((c) => c.impactData[0]),
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 1,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: {
+                beginAtZero: true,
+              },
+              y: {
+                beginAtZero: true,
+              },
+            },
+          },
+        });
+      }
+    </script>
+  </body>
+</html>

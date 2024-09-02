@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Micro-Donation Widget</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css"
+    />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+      }
+      .tabs {
+        display: flex;
+        border-bottom: 1px solid #ccc;
+      }
+      .tab {
+        padding: 10px 20px;
+        cursor: pointer;
+      }
+      .tab.active {
+        background-color: #eee;
+      }
+      .content {
+        padding: 20px;
+        display: none;
+      }
+      .content.active {
+        display: block;
+      }
+      #donationForm {
+        display: flex;
+        flex-direction: column;
+      }
+      #donationForm input,
+      #donationForm button {
+        margin: 5px 0;
+      }
+      #impactChart {
+        width: 100%;
+        height: 300px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="tabs">
+      <div class="tab" data-tab="donate">Donate</div>
+      <div class="tab" data-tab="past">Past Donations</div>
+      <div class="tab" data-tab="recommendations">Recommendations</div>
+      <div class="tab" data-tab="impacts">Impacts</div>
+    </div>
+
+    <div class="content" id="donate">
+      <form id="donationForm">
+        <input
+          type="text"
+          id="charityName"
+          placeholder="Charity Name"
+          required
+        />
+        <input
+          type="number"
+          id="donationAmount"
+          placeholder="Amount"
+          min="1"
+          required
+        />
+        <button type="submit">Donate</button>
+      </form>
+    </div>
+
+    <div class="content" id="past">
+      <table id="donationHistory"></table>
+      <button id="exportBtn">Export to Excel</button>
+    </div>
+
+    <div class="content" id="recommendations">
+      <div id="charityRecommendation"></div>
+    </div>
+
+    <div class="content" id="impacts">
+      <canvas id="impactChart"></canvas>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <script>
+      $(document).ready(function () {
+        const charities = [
+          {
+            name: 'Charity A',
+            mission: 'Education for all',
+            impact: '1000+ students',
+            link: 'http://example.com',
+          },
+          // ... Add more charities here
+        ];
+
+        const showTab = (tabId) => {
+          $('.tab, .content').removeClass('active');
+          $(`.tab[data-tab="${tabId}"], #${tabId}`).addClass('active');
+        };
+
+        $('.tab').on('click', function () {
+          showTab($(this).data('tab'));
+        });
+
+        // Donation Form
+        $('#donationForm').on('submit', function (e) {
+          e.preventDefault();
+          let donation = {
+            charity: $('#charityName').val(),
+            amount: $('#donationAmount').val(),
+            date: new Date().toISOString().split('T')[0],
+          };
+          let donations = JSON.parse(localStorage.getItem('donations') || '[]');
+          donations.push(donation);
+          localStorage.setItem('donations', JSON.stringify(donations));
+          toastr.success('Donation made successfully!');
+          this.reset();
+        });
+
+        // Past Donations
+        function loadDonations() {
+          let donations = JSON.parse(localStorage.getItem('donations') || '[]');
+          let table = $('#donationHistory');
+          table.empty();
+          donations.forEach((d) => {
+            table.append(
+              `<tr><td>${d.charity}</td><td>$${d.amount}</td><td>${d.date}</td></tr>`
+            );
+          });
+        }
+
+        $('#exportBtn').on('click', function () {
+          let donations = JSON.parse(localStorage.getItem('donations') || '[]');
+          let ws = XLSX.utils.json_to_sheet(
+            donations.map((d) => ({
+              Charity: d.charity,
+              Amount: d.amount,
+              Date: d.date,
+            }))
+          );
+          let wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, 'Donations');
+          XLSX.writeFile(wb, 'donations.xlsx');
+        });
+
+        // Recommendations
+        function showRecommendation() {
+          let randomCharity =
+            charities[Math.floor(Math.random() * charities.length)];
+          $('#charityRecommendation').html(`
+                <h3>${randomCharity.name}</h3>
+                <p>Mission: ${randomCharity.mission}</p>
+                <p>Impact: ${randomCharity.impact}</p>
+                <a href="${randomCharity.link}" target="_blank">Learn More</a>
+            `);
+        }
+        showRecommendation();
+
+        // Impacts
+        var ctx = document.getElementById('impactChart').getContext('2d');
+        var myChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: ['Education', 'Healthcare', 'Environment'],
+            datasets: [
+              {
+                label: 'People Impacted',
+                data: [1000, 1500, 500],
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1,
+              },
+            ],
+          },
+          options: { scales: { yAxes: [{ ticks: { beginAtZero: true } }] } },
+        });
+
+        // Initial Load
+        showTab('donate');
+        loadDonations();
+
+        // Reminder setup can be integrated with toastr for notifications
+        // Example: toastr.options = {"positionClass": "toast-top-right"};
+        // Use setInterval or setTimeout for reminders
+      });
+    </script>
+  </body>
+</html>
